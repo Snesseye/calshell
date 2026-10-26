@@ -1,0 +1,44 @@
+[package]
+name = "calshell"
+version = "0.1.0"
+description = "Google Calendar as a real Windows app"
+authors = ["Calshell contributors"]
+license = "MIT"
+repository = "https://github.com/Snesseye/calshell"
+edition = "2021"
+rust-version = "1.82"
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2.5"
+tauri-plugin-autostart = "2.7"
+tauri-plugin-window-state = "2.5"
+tauri-plugin-global-shortcut = "2.4"
+tauri-plugin-notification = "2.7"
+tauri-plugin-opener = "2.7"
+tauri-plugin-log = "2.10"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["net", "time", "sync", "io-util", "macros"] }
+# native-tls uses SChannel on Windows: no C toolchain, cmake or NASM needed.
+reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "native-tls", "http2", "charset"] }
+keyring = { version = "3.6", features = ["windows-native", "apple-native", "linux-native"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = "2"
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.9"
+thiserror = "2"
+
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.8"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
