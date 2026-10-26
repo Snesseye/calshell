@@ -56,6 +56,21 @@ pub fn classify(url: &Url) -> Route {
     }
 }
 
+/// Google Calendar's own sign-in entry point (`service=cl`); it returns to
+/// the calendar once the user is signed in.
+pub const SIGN_IN_URL: &str = "https://accounts.google.com/ServiceLogin?service=cl&passive=1209600&osid=1\
+&continue=https://calendar.google.com/calendar/r&followup=https://calendar.google.com/calendar/r";
+
+/// Signed-out visitors are sometimes sent to the Workspace marketing page,
+/// which offers sign-up and the Admin console but no obvious sign-in.
+pub fn is_signed_out_landing(url: &Url) -> bool {
+    match url.host_str() {
+        Some("workspace.google.com") => url.path().contains("/products/calendar"),
+        Some("www.google.com" | "google.com") => url.path().starts_with("/calendar/about"),
+        _ => false,
+    }
+}
+
 pub fn is_calendar(url: &Url) -> bool {
     url.host_str() == Some("calendar.google.com")
 }
@@ -121,6 +136,25 @@ mod tests {
         ] {
             assert!(matches!(classify(&url(u)), Route::External(_)), "{u}");
         }
+    }
+
+    #[test]
+    fn marketing_landing_is_detected() {
+        for u in [
+            "https://workspace.google.com/products/calendar/",
+            "https://workspace.google.com/intl/nl/products/calendar/?utm_source=x",
+            "https://www.google.com/calendar/about/",
+        ] {
+            assert!(is_signed_out_landing(&url(u)), "{u}");
+        }
+        for u in [
+            "https://workspace.google.com/pricing",
+            "https://calendar.google.com/calendar/r",
+            "https://www.google.com/calendar/event?eid=abc",
+        ] {
+            assert!(!is_signed_out_landing(&url(u)), "{u}");
+        }
+        assert!(Url::parse(SIGN_IN_URL).unwrap().host_str() == Some("accounts.google.com"));
     }
 
     #[test]

@@ -58,6 +58,20 @@ pub fn create_main(app: &AppHandle, visible: bool) -> tauri::Result<WebviewWindo
     .center()
     .visible(false)
     .on_navigation(move |url| {
+        if navigation::is_signed_out_landing(url) {
+            // Navigating from inside this handler can deadlock WebView2, so
+            // swap in the sign-in page from another thread.
+            let app = nav_app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(window) = app.get_webview_window(MAIN) {
+                    let sign_in = Url::parse(navigation::SIGN_IN_URL).expect("valid sign-in url");
+                    if let Err(err) = window.navigate(sign_in) {
+                        log::warn!("could not open Google sign-in: {err}");
+                    }
+                }
+            });
+            return false;
+        }
         if !nav_flag.load(Ordering::Relaxed) {
             return true;
         }
