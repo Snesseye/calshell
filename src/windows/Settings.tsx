@@ -124,8 +124,13 @@ export default function Settings() {
 
       <section className="card">
         <h2>Quick add</h2>
-        <Field label="Shortcut" hint="Opens the quick add box from anywhere.">
-          <HotkeyRecorder value={config.hotkey} onChange={(hotkey) => update({ hotkey })} />
+        <Field label="Shortcut" hint="Opens the quick add box from anywhere. Off registers nothing.">
+          <div className="actions">
+            <HotkeyRecorder value={config.hotkey} onChange={(hotkey) => update({ hotkey })} />
+            <button type="button" onClick={() => update({ hotkey: "" })} disabled={!config.hotkey}>
+              Off
+            </button>
+          </div>
         </Field>
         {view.hotkey_error && <p className="banner error">{view.hotkey_error}</p>}
         <Field label="Add to">
@@ -343,6 +348,11 @@ function HotkeyRecorder({ value, onChange }: { value: string; onChange: (hotkey:
           setRecording(false);
           return;
         }
+        if (e.key === "Backspace" || e.key === "Delete") {
+          setRecording(false);
+          if (value) onChange("");
+          return;
+        }
         const accelerator = toAccelerator(e);
         if (accelerator) {
           setRecording(false);
@@ -350,7 +360,7 @@ function HotkeyRecorder({ value, onChange }: { value: string; onChange: (hotkey:
         }
       }}
     >
-      {recording ? "Press keys…" : value.split("+").map((k, i) => <kbd key={i}>{k}</kbd>)}
+      {recording ? "Press keys…" : value ? value.split("+").map((k, i) => <kbd key={i}>{k}</kbd>) : "Off"}
     </button>
   );
 }

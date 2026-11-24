@@ -30,10 +30,14 @@ pub struct Config {
     pub google_client_secret: Option<String>,
 }
 
+/// Built-in shortcut shipped before 0.1.2. Cleared once on upgrade so
+/// Calshell stops grabbing it; a shortcut chosen afterwards is kept.
+const RETIRED_DEFAULT_HOTKEY: &str = "Ctrl+Shift+Space";
+
 impl Default for Config {
     fn default() -> Self {
         Self {
-            hotkey: "Ctrl+Shift+Space".into(),
+            hotkey: String::new(),
             default_calendar_id: "primary".into(),
             sync_interval_seconds: 60,
             launch_on_startup: true,
@@ -61,7 +65,7 @@ impl Config {
     pub fn load(path: &Path) -> Self {
         match std::fs::read_to_string(path) {
             Ok(raw) => match serde_json::from_str::<Config>(&raw) {
-                Ok(config) => config.normalized(),
+                Ok(config) => Self::migrate_retired_hotkey(path, config.normalized()),
                 Err(err) => {
                     log::warn!("config.json is invalid ({err}), using defaults");
                     let _ = std::fs::rename(path, path.with_extension("json.bak"));
@@ -72,6 +76,10 @@ impl Config {
                 let config = Self::default();
                 if let Err(err) = config.save(path) {
                     log::warn!("could not write default config: {err}");
+                } else {
+                    // Fresh installs never had the old shortcut, so don't
+                    // clear a Ctrl+Shift+Space the user sets later.
+                    Self::mark_hotkey_migrated(path);
                 }
                 config
             }
@@ -87,7 +95,34 @@ impl Config {
         std::fs::rename(tmp, path)
     }
 
+    /// Drops the pre-0.1.2 `Ctrl+Shift+Space` default a single time.
+    /// The marker lives beside `config.json` so choosing that shortcut
+    /// again later is left alone. An empty `hotkey` means disabled.
+    fn migrate_retired_hotkey(path: &Path, mut config: Self) -> Self {
+        let marker = path.with_file_name(".hotkey-default-cleared");
+        if marker.exists() {
+            return config;
+        }
+        if config.hotkey == RETIRED_DEFAULT_HOTKEY {
+            config.hotkey.clear();
+            if let Err(err) = config.save(path) {
+                log::warn!("could not save disabled hotkey: {err}");
+                return config;
+            }
+        }
+        Self::mark_hotkey_migrated(path);
+        config
+    }
+
+    fn mark_hotkey_migrated(path: &Path) {
+        let marker = path.with_file_name(".hotkey-default-cleared");
+        if let Err(err) = std::fs::write(&marker, b"") {
+            log::warn!("could not record hotkey migration: {err}");
+        }
+    }
+
     pub fn normalized(mut self) -> Self {
+        self.hotkey = self.hotkey.trim().to_string();
         self.sync_interval_seconds = self.sync_interval_seconds.clamp(30, 3600);
         self.tray_event_count = self.tray_event_count.clamp(1, 10);
         self.default_event_duration_minutes = self.default_event_duration_minutes.clamp(5, 24 * 60);
@@ -121,6 +156,64 @@ mod tests {
         assert_eq!(config.hotkey, "Alt+Space");
         assert_eq!(config.sync_interval_seconds, 60);
         assert!(config.close_to_tray);
+    }
+
+    #[test]
+    fn upgrade_clears_ctrl_shift_space_once() {
+        let dir = std::env::temp_dir().join(format!("calshell-hotkey-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.json");
+
+        let old = Config {
+            hotkey: "Ctrl+Shift+Space".into(),
+            ..Config::default()
+        };
+        old.save(&path).unwrap();
+        assert_eq!(Config::load(&path).hotkey, "");
+
+        let chosen = Config {
+            hotkey: "Ctrl+Shift+Space".into(),
+            ..Config::load(&path)
+        };
+        chosen.save(&path).unwrap();
+        assert_eq!(Config::load(&path).hotkey, "Ctrl+Shift+Space");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn fresh_install_keeps_ctrl_shift_space_if_chosen_later() {
+        let dir = std::env::temp_dir().join(format!("calshell-hotkey-fresh-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.json");
+        let config = Config::load(&path);
+        assert_eq!(config.hotkey, "");
+        Config {
+            hotkey: "Ctrl+Shift+Space".into(),
+            ..config
+        }
+        .save(&path)
+        .unwrap();
+        assert_eq!(Config::load(&path).hotkey, "Ctrl+Shift+Space");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn upgrade_keeps_a_custom_hotkey() {
+        let dir = std::env::temp_dir().join(format!("calshell-hotkey-custom-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.json");
+        Config {
+            hotkey: "Alt+Space".into(),
+            ..Config::default()
+        }
+        .save(&path)
+        .unwrap();
+        assert_eq!(Config::load(&path).hotkey, "Alt+Space");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

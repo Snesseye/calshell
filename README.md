@@ -46,7 +46,7 @@ So Calshell doesn't rebuild anything. It wraps `calendar.google.com` in a native
 - `calshell.exe https://calendar.google.com/...` opens that page in the running app
 
 ### Native layer (Calendar API)
-- **Quick-add popup**: global hotkey (default `Ctrl+Shift+Space`) opens a tiny always-on-top input. Type `call Sam tomorrow 3pm 30min`, press Enter, done. Uses Google's own natural-language parser (`events.quickAdd`), so it behaves exactly like the web "Quick add". When your text has no length or end time, Calshell applies your default length (30 min unless you change it) instead of Google's fixed 1 hour
+- **Quick-add popup**: an optional global hotkey opens a tiny always-on-top input. It is off until you set one in Settings. Type `call Sam tomorrow 3pm 30min`, press Enter, done. Uses Google's own natural-language parser (`events.quickAdd`), so it behaves exactly like the web "Quick add". When your text has no length or end time, Calshell applies your default length (30 min unless you change it) instead of Google's fixed 1 hour
 - **Tray menu**: next 3 events (configurable) with Join meeting / Open in calendar, plus New event, Open calendar, Sync now, Settings, Quit. Tooltip counts down to the next event
 - **Native notifications**: a background task fires Windows toasts at each event's popup reminder time, with a **Join** button when the event has a Meet, Zoom, Teams or Webex link. Works with the window closed. Declined events stay quiet
 - **Incremental sync**: `events.list` with `syncToken` every 60s, only deltas, negligible quota use
@@ -191,7 +191,7 @@ Stored in `%APPDATA%\calshell\config.json` and editable from Settings:
 
 ```json
 {
-  "hotkey": "Ctrl+Shift+Space",
+  "hotkey": "",
   "default_calendar_id": "primary",
   "sync_interval_seconds": 60,
   "launch_on_startup": true,
@@ -204,6 +204,8 @@ Stored in `%APPDATA%\calshell\config.json` and editable from Settings:
   "disabled_calendar_ids": []
 }
 ```
+
+`hotkey` is an accelerator such as `"Alt+Space"`. `""` disables it: Calshell registers no global shortcut. Settings has the same Off control (or Backspace while recording a new shortcut). Upgrades from 0.1.1 clear the old `Ctrl+Shift+Space` default once; a shortcut you set after that, including that combo, is kept.
 
 Optional keys: `user_agent` (override the WebView2 user agent, see gotchas), `google_client_id` and `google_client_secret` (bring your own OAuth client; these win over a compiled-in one).
 

@@ -275,12 +275,24 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
     }
 }
 
-/// Swaps the registered global hotkey. On failure the previous one is
-/// restored and a user-facing message is returned.
+/// Swaps the registered global hotkey. An empty shortcut unregisters the
+/// previous one and leaves quick add with no global shortcut. On failure
+/// the previous one is restored and a user-facing message is returned.
 pub fn register_hotkey(app: &AppHandle, hotkey: &str, previous: Option<&str>) -> Result<(), String> {
-    let shortcut = Shortcut::from_str(hotkey).map_err(|_| format!("\"{hotkey}\" is not a valid shortcut."))?;
     let manager = app.global_shortcut();
-    let previous = previous.and_then(|p| Shortcut::from_str(p).ok());
+    let previous = previous
+        .map(str::trim)
+        .filter(|shortcut| !shortcut.is_empty())
+        .and_then(|shortcut| Shortcut::from_str(shortcut).ok());
+    let hotkey = hotkey.trim();
+    if hotkey.is_empty() {
+        if let Some(old) = previous {
+            let _ = manager.unregister(old);
+        }
+        *app.state::<AppState>().hotkey_error() = None;
+        return Ok(());
+    }
+    let shortcut = Shortcut::from_str(hotkey).map_err(|_| format!("\"{hotkey}\" is not a valid shortcut."))?;
     if let Some(old) = previous {
         if old == shortcut && manager.is_registered(old) {
             return Ok(());
